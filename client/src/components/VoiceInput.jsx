@@ -10,7 +10,9 @@ const SILENCE_TIMEOUT       = 8;
 const MAX_RECORDING_TIME    = 180;
 const WAVEFORM_BARS         = 14;
 
-// ── Waveform — isolated, renders exactly once ─────────────
+// ─────────────────────────────────────────────────────────
+// WAVEFORM — isolated, renders exactly once
+// ─────────────────────────────────────────────────────────
 const Waveform = memo(({ analyserRef, isActiveRef }) => {
   const barsRef = useRef([]);
   const rafRef  = useRef(null);
@@ -67,7 +69,9 @@ const Waveform = memo(({ analyserRef, isActiveRef }) => {
 });
 Waveform.displayName = 'Waveform';
 
-// ── Timer — isolated, renders once ───────────────────────
+// ─────────────────────────────────────────────────────────
+// RECORDING TIMER — isolated, renders once
+// ─────────────────────────────────────────────────────────
 const RecordingTimer = memo(({ timeRef, maxTime }) => {
   const displayRef = useRef(null);
 
@@ -96,24 +100,44 @@ const RecordingTimer = memo(({ timeRef, maxTime }) => {
 RecordingTimer.displayName = 'RecordingTimer';
 
 // ─────────────────────────────────────────────────────────
+// SILENCE WARNING — isolated, renders once
+// Updated via DOM ref — ZERO re-renders during countdown
+// ─────────────────────────────────────────────────────────
+const SilenceWarning = memo(({ warningRef }) => (
+  <div
+    ref={warningRef}
+    className="silence-warning"
+    style={{ display: 'none' }}
+  >
+    🔇 Silence detected — stopping in <span />s
+  </div>
+));
+SilenceWarning.displayName = 'SilenceWarning';
+
+// ─────────────────────────────────────────────────────────
 // MAIN VOICE INPUT
 // ─────────────────────────────────────────────────────────
 const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => {
 
+  // ── Minimal state — only for phase changes ────────────
   const [phase, setPhase]                       = useState('idle');
-  const [silenceCountdown, setSilenceCountdown] = useState(null);
-  const [transcript, setTranscript]             = useState('');
-  const [transcribeMethod, setTranscribeMethod] = useState('');
   const [error, setError]                       = useState('');
   const [status, setStatus]                     = useState('');
   const [canStop, setCanStop]                   = useState(false);
+  const [transcript, setTranscript]             = useState('');
+  const [transcribeMethod, setTranscribeMethod] = useState('');
 
-  // Shared with sub-components
+  // ── Shared with sub-components ────────────────────────
   const analyserRef      = useRef(null);
   const isRecordingRef   = useRef(false);
   const recordingTimeRef = useRef(0);
 
-  // Internal
+  // ── Silence warning DOM ref ───────────────────────────
+  // Update this directly — no setState, no re-render
+  const silenceWarningRef     = useRef(null);
+  const silenceWarningSpanRef = useRef(null);
+
+  // ── Internal refs ──────────────────────────────────────
   const mediaRecorderRef     = useRef(null);
   const audioChunksRef       = useRef([]);
   const streamRef            = useRef(null);
@@ -124,23 +148,24 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
   const audioContextRef      = useRef(null);
   const mimeTypeRef          = useRef('audio/webm');
 
-  // Silence detection
-  const silenceActiveRef   = useRef(false);
-  const silenceRafRef      = useRef(null);
-  const isSpeakingRef      = useRef(false);
-  const silenceStartRef    = useRef(null);
-  const lastCountdownRef   = useRef(null);
-  const stoppedRef         = useRef(false);
+  // ── Silence detection refs ────────────────────────────
+  const silenceActiveRef       = useRef(false);
+  const silenceRafRef          = useRef(null);
+  const isSpeakingRef          = useRef(false);
+  const silenceStartRef        = useRef(null);
+  const lastCountdownRef       = useRef(null);
+  const stoppedRef             = useRef(false);
 
-  // ── Adaptive threshold calibration ───────────────────
-  // Measures noise floor in first 2s then sets threshold
-  // relative to actual speaking volume
-  const noiseFloorRef       = useRef(0);
-  const calibrationSamples  = useRef([]);
-  const isCalibrated        = useRef(false);
-  const speakingPeakRef     = useRef(0); // track peak speaking volume
-  // Dynamic threshold: set after first speech detected
-  const dynamicThresholdRef = useRef(20); // default fallback
+  // ── Adaptive threshold refs ───────────────────────────
+  const noiseFloorRef          = useRef(0);
+  const calibrationSamples     = useRef([]);
+  const isCalibratedRef        = useRef(false);
+  const speakingPeakRef        = useRef(0);
+  const dynamicThresholdRef    = useRef(20);
+
+  // ── Can-stop button DOM ref ───────────────────────────
+  const canStopBtnRef          = useRef(null);
+  const minTimeHintRef         = useRef(null);
 
   useEffect(() => { return () => cleanupAll(); }, []);
 
@@ -158,13 +183,32 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
     }
   };
 
+  // ── Show/hide silence warning via DOM (no re-render) ──
+  const showSilenceWarning = (seconds) => {
+    if (!silenceWarningRef.current) return;
+    silenceWarningRef.current.style.display = 'flex';
+    // Update just the number
+    const span = silenceWarningRef.current.querySelector('span');
+    if (span) span.textContent = seconds;
+  };
+
+  const hideSilenceWarning = () => {
+    if (!silenceWarningRef.current) return;
+    silenceWarningRef.current.style.display = 'none';
+  };
+
+  // ── Show/hide can-stop button via DOM ─────────────────
+  const showCanStopBtn = () => {
+    if (canStopBtnRef.current)  canStopBtnRef.current.style.display  = 'flex';
+    if (minTimeHintRef.current) minTimeHintRef.current.style.display = 'none';
+  };
+
   const startRecording = async () => {
     setError('');
     setTranscript('');
     setStatus('');
-    setSilenceCountdown(null);
-    setCanStop(false);
     stoppedRef.current = false;
+    setCanStop(false);
 
     audioChunksRef.current       = [];
     browserTranscriptRef.current = '';
@@ -174,9 +218,11 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
     lastCountdownRef.current     = null;
     noiseFloorRef.current        = 0;
     calibrationSamples.current   = [];
-    isCalibrated.current         = false;
+    isCalibratedRef.current      = false;
     speakingPeakRef.current      = 0;
-    dynamicThresholdRef.current  = 20; // reset to default
+    dynamicThresholdRef.current  = 20;
+
+    hideSilenceWarning();
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -195,7 +241,7 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
       const source   = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize               = 256;
-      analyser.smoothingTimeConstant = 0.5; // Less smoothing for faster response
+      analyser.smoothingTimeConstant = 0.5;
       source.connect(analyser);
       analyserRef.current = analyser;
 
@@ -222,11 +268,11 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
       onRecordingStateChange(true);
       setStatus('🎙️ Calibrating... Start speaking');
 
-      // Timer
       recordingTimerRef.current = setInterval(() => {
         recordingTimeRef.current += 1;
         if (recordingTimeRef.current === MIN_SPEAKING_DURATION) {
-          setCanStop(true);
+          // Show button via DOM — no setState
+          showCanStopBtn();
         }
       }, 1000);
 
@@ -238,7 +284,7 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
 
     } catch (err) {
       if (err.name === 'NotAllowedError') {
-        setError('❌ Microphone denied. Allow microphone access in Chrome.');
+        setError('❌ Microphone denied. Please allow microphone in Chrome.');
       } else {
         setError(`❌ Microphone error: ${err.message}`);
       }
@@ -246,34 +292,16 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
   };
 
   // ─────────────────────────────────────────────────────
-  // ADAPTIVE SILENCE DETECTION
-  //
-  // How it works:
-  // Phase 1 — Calibration (first 2 seconds):
-  //   Measure noise floor (ambient mic level when silent)
-  //   Status shows "Calibrating..."
-  //
-  // Phase 2 — Speaking detection:
-  //   avg > (noiseFloor * 3) = speaking
-  //   Track peak speaking volume
-  //
-  // Phase 3 — Silence detection:
-  //   isSpeakingRef = true AND avg < dynamicThreshold
-  //   dynamicThreshold = max(noiseFloor * 2, speakingPeak * 0.25)
-  //   This means: you need to drop to 25% of your speaking volume
-  //   before it counts as silence
-  //
-  // This completely eliminates the fixed threshold problem
+  // SILENCE DETECTION — ALL DOM updates, ZERO setState
+  // showSilenceWarning() / hideSilenceWarning() update
+  // DOM directly — no component re-renders at all
   // ─────────────────────────────────────────────────────
   const startSilenceLoop = () => {
-    const dataArray = new Uint8Array(64);
-    const CALIBRATION_FRAMES = 30; // ~2s at 15fps
+    const dataArray          = new Uint8Array(64);
+    const CALIBRATION_FRAMES = 30;
 
     const loop = () => {
-      if (!silenceActiveRef.current) {
-        console.log('🔇 Silence loop exited');
-        return;
-      }
+      if (!silenceActiveRef.current) return;
 
       let avg = 0;
 
@@ -287,91 +315,78 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
         return;
       }
 
-      // ── Phase 1: Calibrate noise floor ──────────────
-      if (!isCalibrated.current) {
+      // ── Phase 1: Calibrate noise floor ────────────────
+      if (!isCalibratedRef.current) {
         calibrationSamples.current.push(avg);
 
         if (calibrationSamples.current.length >= CALIBRATION_FRAMES) {
-          // Sort and take median (ignore spikes)
-          const sorted = [...calibrationSamples.current].sort((a, b) => a - b);
-          const median = sorted[Math.floor(sorted.length / 2)];
-          noiseFloorRef.current = median;
-
-          // Initial dynamic threshold: 3x noise floor
-          // Must be at least 15 to avoid false triggers
+          const sorted  = [...calibrationSamples.current].sort((a, b) => a - b);
+          const median  = sorted[Math.floor(sorted.length / 2)];
+          noiseFloorRef.current       = median;
           dynamicThresholdRef.current = Math.max(15, median * 3);
-          isCalibrated.current        = true;
-
-          console.log(
-            `🎙️ Calibrated: noise floor=${median.toFixed(1)}, ` +
-            `silence threshold=${dynamicThresholdRef.current.toFixed(1)}`
-          );
-
+          isCalibratedRef.current     = true;
           setStatus('🎙️ Listening... Speak your answer');
         }
 
-        silenceRafRef.current = requestAnimationFrame(loop);
+        if (silenceActiveRef.current) {
+          silenceRafRef.current = requestAnimationFrame(loop);
+        }
         return;
       }
 
-      // ── Phase 2 & 3: Speaking + silence detection ──
-      const threshold = dynamicThresholdRef.current;
+      // ── Phase 2: Speaking + silence detection ─────────
+      const threshold  = dynamicThresholdRef.current;
       const isSpeaking = avg > threshold;
 
       if (isSpeaking) {
-        isSpeakingRef.current  = true;
+        isSpeakingRef.current   = true;
         silenceStartRef.current = null;
 
-        // Track peak volume to refine threshold
+        // Update peak + refine threshold
         if (avg > speakingPeakRef.current) {
-          speakingPeakRef.current = avg;
-          // Update threshold: must drop to 30% of speaking peak
-          const newThreshold = Math.max(
+          speakingPeakRef.current      = avg;
+          dynamicThresholdRef.current  = Math.max(
             dynamicThresholdRef.current,
             speakingPeakRef.current * 0.30
           );
-          dynamicThresholdRef.current = newThreshold;
         }
 
+        // Hide warning via DOM if it was shown
         if (lastCountdownRef.current !== null) {
           lastCountdownRef.current = null;
-          setSilenceCountdown(null);
+          hideSilenceWarning(); // ← DOM update, no setState
         }
 
       } else if (
         isSpeakingRef.current &&
         recordingTimeRef.current >= MIN_SPEAKING_DURATION
       ) {
-        // Silence after confirmed speaking
         if (!silenceStartRef.current) {
           silenceStartRef.current = Date.now();
-          console.log(
-            `🔇 Silence started | avg=${avg.toFixed(1)} ` +
-            `threshold=${threshold.toFixed(1)}`
-          );
         }
 
         const elapsed   = (Date.now() - silenceStartRef.current) / 1000;
         const remaining = SILENCE_TIMEOUT - elapsed;
 
         if (remaining <= 0) {
-          console.log(`✅ ${SILENCE_TIMEOUT}s silence — auto stopping`);
           silenceActiveRef.current = false;
           triggerStop('silence');
           return;
         }
 
+        // ── KEY FIX: DOM update instead of setState ────
+        // No re-render — just update the number in the span
         const countInt = Math.ceil(remaining);
         if (countInt !== lastCountdownRef.current) {
           lastCountdownRef.current = countInt;
-          setSilenceCountdown(countInt);
+          showSilenceWarning(countInt); // ← DOM update, no setState
         }
 
-      } else if (!isSpeakingRef.current) {
+      } else {
         silenceStartRef.current = null;
         if (lastCountdownRef.current !== null) {
           lastCountdownRef.current = null;
-          setSilenceCountdown(null);
+          hideSilenceWarning(); // ← DOM update, no setState
         }
       }
 
@@ -387,21 +402,17 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
     if (stoppedRef.current) return;
     stoppedRef.current = true;
 
-    console.log(`⏹️ triggerStop: ${reason}`);
-
     silenceActiveRef.current = false;
     isRecordingRef.current   = false;
 
     cancelAnimationFrame(silenceRafRef.current);
     clearInterval(recordingTimerRef.current);
     clearTimeout(maxTimerRef.current);
-    setSilenceCountdown(null);
-    setCanStop(false);
+
+    hideSilenceWarning();
 
     streamRef.current?.getTracks().forEach((t) => t.stop());
     try { recognitionRef.current?.stop(); } catch {}
-
-    // Null analyser BEFORE closing context
     analyserRef.current = null;
 
     if (audioContextRef.current?.state !== 'closed') {
@@ -424,7 +435,7 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
 
   const handleManualStop = () => {
     if (recordingTimeRef.current < MIN_SPEAKING_DURATION) {
-      setError(`⚠️ Speak for at least ${MIN_SPEAKING_DURATION} seconds first.`);
+      setError(`⚠️ Please speak for at least ${MIN_SPEAKING_DURATION} seconds first.`);
       return;
     }
     triggerStop('manual');
@@ -462,7 +473,6 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
       const blob = new Blob(audioChunksRef.current, {
         type: mimeTypeRef.current,
       });
-      console.log(`📦 Audio: ${blob.size} bytes`);
 
       if (blob.size < 1000) {
         setError('⚠️ Recording too short. Please speak for at least 3 seconds.');
@@ -510,7 +520,6 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
     setStatus('');
     onTranscriptReady(text);
     onRecordingStateChange(false);
-    console.log(`🔒 Locked [${method}]`);
   };
 
   return (
@@ -539,35 +548,59 @@ const VoiceInput = ({ onTranscriptReady, onRecordingStateChange, isLocked }) => 
       {phase === 'recording' && (
         <div className="voice-recording">
 
+          {/* Waveform — renders once, own rAF loop */}
           <Waveform
             analyserRef={analyserRef}
             isActiveRef={isRecordingRef}
           />
 
+          {/* Timer — renders once, own interval */}
           <RecordingTimer
             timeRef={recordingTimeRef}
             maxTime={MAX_RECORDING_TIME}
           />
 
+          {/* Status — only changes on phase transitions */}
           <p className="recording-live-status">{status}</p>
 
-          {silenceCountdown !== null && (
-            <div className="silence-warning">
-              🔇 Silence detected — stopping in {silenceCountdown}s
-            </div>
-          )}
+          {/*
+            ── SILENCE WARNING — DOM-only updates ──────────
+            Rendered once. show/hide + number updates
+            happen via direct DOM manipulation.
+            ZERO React re-renders during countdown.
+          */}
+          <div
+            ref={silenceWarningRef}
+            className="silence-warning"
+            style={{ display: 'none' }}
+          >
+            🔇 Silence detected — stopping in{' '}
+            <strong ref={silenceWarningSpanRef} style={{ margin: '0 3px' }}>0</strong>s
+          </div>
 
-          {!canStop && (
-            <p className="min-time-hint">
-              Speak for at least {MIN_SPEAKING_DURATION}s before manual stop
-            </p>
-          )}
+          {/*
+            ── MIN TIME HINT — hidden via DOM when ready ───
+          */}
+          <p
+            ref={minTimeHintRef}
+            className="min-time-hint"
+          >
+            Speak for at least {MIN_SPEAKING_DURATION}s before manual stop
+          </p>
 
-          {canStop && (
-            <button className="record-stop-btn" onClick={handleManualStop}>
-              ⏹️ Done Speaking
-            </button>
-          )}
+          {/*
+            ── DONE SPEAKING BUTTON — shown via DOM ────────
+            Initially hidden. showCanStopBtn() reveals it
+            via direct DOM without re-render.
+          */}
+          <button
+            ref={canStopBtnRef}
+            className="record-stop-btn"
+            onClick={handleManualStop}
+            style={{ display: 'none' }}
+          >
+            ⏹️ Done Speaking
+          </button>
 
         </div>
       )}
