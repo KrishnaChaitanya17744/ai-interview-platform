@@ -14,7 +14,7 @@ const app = express();
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'https://ai-interview-platform-delta-ten.vercel.app', // ← NO /login at the end
+    'https://ai-interview-platform-delta-ten.vercel.app',
     /\.vercel\.app$/,
   ],
   methods:     ['GET', 'POST', 'PUT', 'DELETE'],
