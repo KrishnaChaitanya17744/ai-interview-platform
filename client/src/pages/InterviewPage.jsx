@@ -1,12 +1,12 @@
 // client/src/pages/InterviewPage.jsx
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import RoleSelector   from '../components/RoleSelector';
 import QuestionDisplay from '../components/QuestionDisplay';
 import FeedbackDisplay from '../components/FeedbackDisplay';
 import { generateQuestion, evaluateAnswer } from '../services/api';
+import { useNavigate, Link } from 'react-router-dom';
 
 const InterviewPage = () => {
 
@@ -160,20 +160,23 @@ const InterviewPage = () => {
           and instant AI feedback — built for serious candidates.
         </p>
 
-        {/* User info + logout */}
-        {user && (
-          <div className="header-user-bar">
-            <span className="header-user-name">
-              👋 {user.name}
-            </span>
-            <button
-              className="header-logout-btn"
-              onClick={handleLogout}
-            >
-              Sign Out
-            </button>
-          </div>
-        )}
+        {/* User info + navigation + logout */}
+{user && (
+  <div className="header-user-bar">
+    <span className="header-user-name">
+      👋 {user.name}
+    </span>
+    <Link to="/dashboard" className="header-dashboard-link">
+      ← Dashboard
+    </Link>
+    <button
+      className="header-logout-btn"
+      onClick={handleLogout}
+    >
+      Sign Out
+    </button>
+  </div>
+)}
       </header>
 
       {/* ── Step Indicator ─────────────────────────────── */}

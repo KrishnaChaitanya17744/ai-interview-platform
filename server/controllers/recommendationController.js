@@ -1,7 +1,7 @@
 // server/controllers/recommendationController.js
 
 const Session = require('../models/Session');
-const { generateRecommendations } = require('../config/gemini');
+const { routeRecommendations } = require('../config/modelRouter');
 const { logSecurityEvent } = require('../utils/securityLogger');
 
 // ─────────────────────────────────────────────────────────
@@ -35,10 +35,9 @@ const getRecommendations = async (req, res) => {
     const performanceSummary = buildPerformanceSummary(sessions);
 
     // ── Generate AI recommendations ───────────────────────
-    const recommendations = await generateRecommendations(
-      performanceSummary,
-      req.user.name
-    );
+    const { result: recommendations } = await routeRecommendations(
+  performanceSummary, req.user.name
+);
 
     // SECURITY FIX: `rawText` (raw Gemini response) is removed from the
     // API response. It could contain prompt content or reveal AI internals.

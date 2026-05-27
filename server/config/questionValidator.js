@@ -1,176 +1,148 @@
 // server/config/questionValidator.js
 
-// ─────────────────────────────────────────────────────────
-// Validates whether a generated question meets
-// quality standards before serving to the user
-// ─────────────────────────────────────────────────────────
-
-// Minimum question length
-const MIN_LENGTH = 20;
-const MAX_LENGTH = 500;
-
-// Keywords that indicate off-topic or low quality
-const BLACKLIST_PATTERNS = [
-  /as an ai/i,
-  /i cannot/i,
-  /i am unable/i,
-  /i don't know/i,
-  /please provide/i,
-  /\[insert/i,
-  /\[your/i,
-  /undefined/i,
-  /error/i,
-  /sorry/i,
-];
-
-// Role-specific keywords that SHOULD appear
+// ── Role keyword lists ────────────────────────────────────
 const ROLE_KEYWORDS = {
   frontend: [
-    'html', 'css', 'javascript', 'react', 'vue', 'angular',
-    'dom', 'browser', 'ui', 'component', 'web', 'frontend',
-    'responsive', 'layout', 'style', 'typescript', 'api',
-    'performance', 'render', 'hook', 'state', 'event',
-    'accessibility', 'animation', 'design',
+    'react', 'javascript', 'css', 'html', 'dom', 'component',
+    'hook', 'state', 'props', 'rendering', 'browser', 'api',
+    'redux', 'typescript', 'responsive', 'webpack', 'vite',
+    'performance', 'accessibility', 'ui', 'event', 'async',
+    'promise', 'fetch', 'rest', 'web', 'frontend', 'client',
+    'layout', 'flexbox', 'grid', 'animation', 'optimization',
   ],
   backend: [
-    'api', 'server', 'database', 'node', 'express', 'sql',
-    'nosql', 'mongodb', 'rest', 'http', 'authentication',
-    'authorization', 'middleware', 'query', 'endpoint',
-    'microservice', 'cache', 'security', 'backend', 'scale',
-    'architecture', 'deployment', 'docker',
+    'node', 'express', 'api', 'database', 'server', 'rest',
+    'http', 'authentication', 'jwt', 'sql', 'nosql', 'mongodb',
+    'postgres', 'caching', 'redis', 'middleware', 'microservice',
+    'scalability', 'security', 'endpoint', 'request', 'response',
+    'backend', 'performance', 'indexing', 'query', 'data',
+    'architecture', 'deployment', 'docker', 'cloud', 'async',
   ],
   data: [
-    'data', 'model', 'algorithm', 'machine learning', 'python',
-    'pandas', 'numpy', 'statistics', 'analysis', 'dataset',
-    'training', 'feature', 'accuracy', 'neural', 'prediction',
-    'classification', 'regression', 'clustering', 'sql', 'query',
-    'visualization', 'distribution',
+    'python', 'machine learning', 'model', 'dataset', 'algorithm',
+    'neural', 'feature', 'regression', 'classification', 'pandas',
+    'numpy', 'tensorflow', 'pytorch', 'data', 'analysis', 'sql',
+    'visualization', 'statistics', 'training', 'overfitting',
+    'accuracy', 'preprocessing', 'clustering', 'prediction',
+    'deep learning', 'ai', 'nlp', 'computer vision',
   ],
   hr: [
-    'team', 'experience', 'situation', 'challenge', 'leadership',
-    'communication', 'conflict', 'goal', 'strength', 'weakness',
-    'motivat', 'career', 'work', 'project', 'pressure',
-    'deadline', 'adapt', 'learn', 'collaborat', 'feedback',
+    'team', 'challenge', 'conflict', 'leadership', 'goal',
+    'strength', 'weakness', 'experience', 'project', 'failure',
+    'success', 'motivation', 'communication', 'problem', 'work',
+    'colleague', 'manager', 'deadline', 'priority', 'feedback',
+    'growth', 'learn', 'contribute', 'situation', 'describe',
+    'example', 'time', 'tell me', 'how do you', 'what would',
   ],
 };
 
+const BLACKLIST = [
+  "i'll", "i will", "sure!", "certainly!", "of course",
+  "here's a question", "here is a question", "here's an interview",
+  "as requested", "as an interviewer", "i'd be happy",
+  "let me give you", "i'm going to", "i am going to",
+];
+
 // ─────────────────────────────────────────────────────────
 // VALIDATE QUESTION
-// Returns { isValid, reason, score }
+// Returns { isValid: bool, reason: string }
 // ─────────────────────────────────────────────────────────
 const validateQuestion = (question, role, company) => {
-
-  // ── Check 1: Length ────────────────────────────────────
-  if (!question || question.length < MIN_LENGTH) {
-    return {
-      isValid: false,
-      reason: 'Question too short',
-      score: 0,
-    };
+  if (!question || typeof question !== 'string') {
+    return { isValid: false, reason: 'Empty or invalid question' };
   }
 
-  if (question.length > MAX_LENGTH) {
-    return {
-      isValid: false,
-      reason: 'Question too long',
-      score: 0,
-    };
+  const q       = question.trim();
+  const qLower  = q.toLowerCase();
+
+  // ── 1. Length check ─────────────────────────────────────
+  if (q.length < 15) {
+    return { isValid: false, reason: `Too short: ${q.length} chars` };
   }
 
-  // ── Check 2: Blacklist patterns ────────────────────────
-  for (const pattern of BLACKLIST_PATTERNS) {
-    if (pattern.test(question)) {
+  if (q.length > 600) {
+    return { isValid: false, reason: `Too long: ${q.length} chars` };
+  }
+
+  // ── 2. Blacklist check ───────────────────────────────────
+  for (const phrase of BLACKLIST) {
+    if (qLower.includes(phrase)) {
       return {
         isValid: false,
-        reason: `Contains invalid pattern: ${pattern}`,
-        score: 0,
+        reason:  `Contains blacklisted phrase: "${phrase}"`,
       };
     }
   }
 
-  // ── Check 3: Must end properly ─────────────────────────
-  const endsWithPunctuation = /[?.!]$/.test(question.trim());
-  if (!endsWithPunctuation) {
-    return {
-      isValid: false,
-      reason: 'Question does not end with proper punctuation',
-      score: 0,
-    };
-  }
-
-  // ── Check 4: Role relevance score ─────────────────────
-  const keywords = ROLE_KEYWORDS[role] || [];
-  const lowerQuestion = question.toLowerCase();
-
-  const matchedKeywords = keywords.filter((kw) =>
-    lowerQuestion.includes(kw.toLowerCase())
+  // ── 3. Must look like a question or instruction ──────────
+  // Accepts: ends with ? OR starts with a question/action word
+  // This is intentionally lenient for both Gemini and Groq output
+  const endsWithQuestion = q.endsWith('?');
+  const questionStarters = [
+    'what', 'how', 'why', 'when', 'where', 'who', 'which',
+    'explain', 'describe', 'design', 'implement', 'write',
+    'can you', 'could you', 'tell me', 'walk me', 'imagine',
+    'suppose', 'given', 'you are', 'your', 'if you',
+    'compare', 'differentiate', 'discuss', 'define',
+  ];
+  const startsLikeQuestion = questionStarters.some((s) =>
+    qLower.startsWith(s)
   );
 
-  const relevanceScore = Math.min(
-    10,
-    Math.round((matchedKeywords.length / Math.max(keywords.length * 0.15, 1)) * 10)
-  );
-
-  // ── Check 5: Must have minimum relevance ──────────────
-  if (relevanceScore < 3) {
+  if (!endsWithQuestion && !startsLikeQuestion) {
     return {
       isValid: false,
-      reason: `Low relevance score: ${relevanceScore}/10 for role: ${role}`,
-      score: relevanceScore,
+      reason:  'Does not appear to be a question or instruction',
     };
   }
 
-  // ── Check 6: Must be a question ───────────────────────
-  const hasQuestionIndicator =
-    question.includes('?') ||
-    /^(what|how|why|explain|describe|tell|when|which|compare|define)/i
-      .test(question.trim());
+  // ── 4. Role keyword relevance ────────────────────────────
+  // Only check if role has defined keywords
+  const keywords = ROLE_KEYWORDS[role];
+  if (keywords) {
+    const matches = keywords.filter((kw) => qLower.includes(kw));
 
-  if (!hasQuestionIndicator) {
-    return {
-      isValid: false,
-      reason: 'Does not appear to be a question',
-      score: relevanceScore,
-    };
+    // Only 2 keywords required — lenient enough for general questions
+    if (matches.length < 2) {
+      // HR questions often don't have technical keywords — be more lenient
+      if (role === 'hr' && q.length > 30) {
+        return { isValid: true, reason: 'HR question accepted' };
+      }
+      return {
+        isValid: false,
+        reason:  `Low role relevance (${matches.length} keywords matched for ${role})`,
+      };
+    }
   }
 
-  return {
-    isValid: true,
-    reason: 'Passed all validation checks',
-    score: relevanceScore,
-  };
+  return { isValid: true, reason: 'Passed all checks' };
 };
 
 // ─────────────────────────────────────────────────────────
-// CHECK FOR DUPLICATES
-// Returns true if question is too similar to asked ones
+// IS DUPLICATE
+// Jaccard similarity > 0.6 = duplicate
 // ─────────────────────────────────────────────────────────
-const isDuplicate = (newQuestion, askedQuestions = []) => {
-  if (!askedQuestions.length) return false;
+const isDuplicate = (question, askedQuestions) => {
+  if (!askedQuestions || askedQuestions.length === 0) return false;
 
-  const normalize = (str) =>
-    str.toLowerCase()
-       .replace(/[^a-z0-9\s]/g, '')
-       .split(' ')
-       .filter(Boolean)
-       .join(' ');
-
-  const newNorm = normalize(newQuestion);
-  const newWords = new Set(newNorm.split(' '));
+  const wordsA = new Set(
+    question.toLowerCase().split(/\W+/).filter((w) => w.length > 3)
+  );
 
   for (const asked of askedQuestions) {
-    const askedNorm = normalize(asked);
-    const askedWords = new Set(askedNorm.split(' '));
-
-    // Calculate word overlap (Jaccard similarity)
-    const intersection = new Set(
-      [...newWords].filter((w) => askedWords.has(w))
+    const wordsB = new Set(
+      asked.toLowerCase().split(/\W+/).filter((w) => w.length > 3)
     );
-    const union = new Set([...newWords, ...askedWords]);
+
+    const intersection = new Set([...wordsA].filter((w) => wordsB.has(w)));
+    const union        = new Set([...wordsA, ...wordsB]);
+
+    if (union.size === 0) continue;
+
     const similarity = intersection.size / union.size;
 
-    // If more than 60% similar → duplicate
     if (similarity > 0.6) {
+      console.log(`Duplicate detected (similarity: ${similarity.toFixed(2)})`);
       return true;
     }
   }

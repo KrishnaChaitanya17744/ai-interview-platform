@@ -8,11 +8,12 @@ import {
   Navigate,
 } from 'react-router-dom';
 
-import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute  from './components/ProtectedRoute';
-import LoginPage       from './pages/LoginPage';
-import RegisterPage    from './pages/RegisterPage';
-import InterviewPage   from './pages/InterviewPage';
+import { AuthProvider }    from './context/AuthContext';
+import ProtectedRoute      from './components/ProtectedRoute';
+import LoginPage           from './pages/LoginPage';
+import RegisterPage        from './pages/RegisterPage';
+import InterviewPage       from './pages/InterviewPage';
+import DashboardPage       from './pages/DashboardPage';   // ← NEW
 
 import './App.css';
 
@@ -21,12 +22,9 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-
-          {/* Public routes */}
-          <Route path="/login"    element={<LoginPage />}    />
+          <Route path="/login"    element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* Protected routes */}
           <Route
             path="/interview"
             element={
@@ -38,10 +36,18 @@ function App() {
             }
           />
 
-          {/* Default redirect */}
-          <Route path="/"  element={<Navigate to="/interview" replace />} />
-          <Route path="*"  element={<Navigate to="/interview" replace />} />
+          {/* NEW */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
 
+          <Route path="/"  element={<Navigate to="/dashboard" replace />} />
+          <Route path="*"  element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>
     </AuthProvider>

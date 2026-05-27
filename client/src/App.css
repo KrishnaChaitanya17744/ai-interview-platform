@@ -1743,6 +1743,25 @@
   font-family: var(--font-sans);
 }
 
+.header-dashboard-link {
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.15);
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  font-family: var(--font-sans);
+}
+
+.header-dashboard-link:hover {
+  background: rgba(255,255,255,0.1);
+  color: white;
+  border-color: rgba(255,255,255,0.3);
+}
+
 .header-logout-btn:hover {
   background: rgba(255,255,255,0.2);
   color: white;

@@ -1,14 +1,13 @@
 // server/controllers/interviewController.js
 
 const {
-  generateInterviewQuestion,
-  evaluateInterviewAnswer,
-} = require('../config/gemini');
+  routeGenerateQuestion,
+  routeEvaluateAnswer,
+} = require('../config/modelRouter');
 
 const { validateQuestion, isDuplicate } = require('../config/questionValidator');
 const Session        = require('../models/Session');
 const CompanyDataset = require('../models/CompanyDataset');
-const { stripHtmlTags } = require('../utils/sanitize');
 
 const getDatasetQuestion = async (role, company, askedQuestions = []) => {
   try {
@@ -44,45 +43,59 @@ const getDatasetQuestion = async (role, company, askedQuestions = []) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────
+// POST /api/interview/generate-question
+// ─────────────────────────────────────────────────────────
 const generateQuestion = async (req, res) => {
   try {
-    const { role, companyType, company, askedQuestions } = req.body;
+    const { role, companyType, company, askedQuestions = [] } = req.body;
 
-    const sanitizedAsked = askedQuestions.map((q) => stripHtmlTags(q, 500));
+    if (!role || !companyType || !company) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide role, companyType, and company.',
+      });
+    }
 
     let finalQuestion = null;
     let source        = '';
-    const MAX_TRIES   = 2;
+    let provider      = '';
 
-    for (let i = 0; i < MAX_TRIES; i++) {
+    // Try AI (with automatic Gemini → Groq fallback)
+    for (let i = 0; i < 2; i++) {
       try {
-        console.log(`AI attempt ${i + 1} [${company} - ${role}]`);
+        console.log(`🤖 AI attempt ${i + 1} [${company} - ${role}]`);
 
-        const aiQuestion = await generateInterviewQuestion(
-          role, companyType, company, sanitizedAsked
-        );
+        const { result: aiQuestion, provider: prov } =
+          await routeGenerateQuestion(
+            role, companyType, company, askedQuestions
+          );
 
         const validation = validateQuestion(aiQuestion, role, company);
 
-        if (validation.isValid && !isDuplicate(aiQuestion, sanitizedAsked)) {
-          finalQuestion = stripHtmlTags(aiQuestion, 500);
+        if (validation.isValid && !isDuplicate(aiQuestion, askedQuestions)) {
+          finalQuestion = aiQuestion;
           source        = 'ai_generated';
+          provider      = prov;
           break;
         }
 
-        console.log(`Validation failed: ${validation.reason}`);
+        console.log(`⚠️ Validation failed: ${validation.reason}`);
+
       } catch (err) {
-        console.error(`AI attempt ${i + 1} error:`, err.message);
+        console.error(`AI attempt ${i + 1} error: ${err.message}`);
       }
     }
 
+    // Fallback to dataset
     if (!finalQuestion) {
-      console.log('Falling back to dataset...');
-      const entry = await getDatasetQuestion(role, company, sanitizedAsked);
+      console.log('📚 Falling back to dataset...');
+      const entry = await getDatasetQuestion(role, company, askedQuestions);
 
       if (entry) {
-        finalQuestion = stripHtmlTags(entry.question, 500);
+        finalQuestion = entry.question;
         source        = `dataset_${entry.source}`;
+        provider      = 'dataset';
       }
     }
 
@@ -97,7 +110,9 @@ const generateQuestion = async (req, res) => {
       success: true,
       question: finalQuestion,
       source,
+      provider,
     });
+
   } catch (error) {
     console.error('Generate question error:', error.message);
     res.status(500).json({
@@ -107,6 +122,9 @@ const generateQuestion = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────
+// POST /api/interview/evaluate-answer
+// ─────────────────────────────────────────────────────────
 const evaluateAnswer = async (req, res) => {
   try {
     const {
@@ -114,42 +132,45 @@ const evaluateAnswer = async (req, res) => {
       company, answerMode, emotionData,
     } = req.body;
 
-    const safeQuestion = stripHtmlTags(question, 2000);
-    const safeAnswer   = stripHtmlTags(answer, 15000);
+    if (!question || !answer || !role || !companyType || !company) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields.',
+      });
+    }
 
-    const feedback = await evaluateInterviewAnswer(
+    // Evaluate with automatic fallback
+    const { result: feedback, provider } = await routeEvaluateAnswer(
       role, companyType, company,
-      safeQuestion, safeAnswer, answerMode || 'voice'
+      question, answer, answerMode || 'voice'
     );
 
+    console.log(`📝 Evaluation complete [${provider}]`);
+
+    // Save session
     const session = new Session({
       userId:     req.user._id,
-      role,
-      companyType,
-      company,
-      question:   safeQuestion,
-      answer:     safeAnswer,
-      answerMode: answerMode || 'voice',
-      score:       feedback.score,
-      strengths:   feedback.strengths,
+      role, companyType, company,
+      question, answer,
+      answerMode:   answerMode || 'voice',
+      score:        feedback.score,
+      strengths:    feedback.strengths,
       improvements: feedback.improvements,
-      summary:     feedback.summary,
-      emotionData: emotionData || {
-        confidence:      0,
-        nervousness:     0,
-        eyeContact:      0,
-        facePresence:    0,
-        engagementScore: 0,
+      summary:      feedback.summary,
+      emotionData:  emotionData || {
+        confidence: 0, nervousness: 0,
+        eyeContact: 0, facePresence: 0, engagementScore: 0,
       },
     });
 
     await session.save();
-    console.log(`Session saved for user: ${req.user.email}`);
 
     res.status(200).json({
       success: true,
       feedback,
+      provider, // optional: shows which model evaluated
     });
+
   } catch (error) {
     console.error('Evaluate answer error:', error.message);
     res.status(500).json({
