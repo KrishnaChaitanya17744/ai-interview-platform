@@ -1,0 +1,503 @@
+/* client/src/history.css */
+
+.hist-page {
+  min-height: 100vh;
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+}
+
+.hist-main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ── Page header ─────────────────────────────────────── */
+.hist-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.hist-page-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  letter-spacing: -0.03em;
+  margin-bottom: 4px;
+}
+
+.hist-page-sub {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+/* ── Filters ─────────────────────────────────────────── */
+.hist-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.hist-filter-select {
+  background: var(--color-bg-card);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-family: var(--font-sans);
+  padding: 7px 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--transition-fast);
+  text-transform: capitalize;
+}
+
+.hist-filter-select:focus {
+  border-color: var(--color-accent);
+}
+
+.hist-filter-clear {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-md);
+  font-size: 0.78rem;
+  font-family: var(--font-sans);
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.hist-filter-clear:hover {
+  border-color: #f87171;
+  color: #f87171;
+}
+
+/* ── Session list ────────────────────────────────────── */
+.hist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hist-session-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.hist-session-card:hover {
+  border-color: rgba(79,110,247,0.35);
+  background: var(--color-bg-card-hover);
+  transform: translateX(3px);
+}
+
+.hist-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  width: 185px;
+}
+
+.hist-card-info { flex: 1; min-width: 0; }
+
+.hist-card-company {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  text-transform: capitalize;
+  letter-spacing: -0.01em;
+}
+
+.hist-card-role {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.hist-card-dot { opacity: 0.4; }
+
+.hist-card-question {
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  min-width: 0;
+}
+
+.hist-card-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.hist-score-badge {
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.hist-card-chevron {
+  color: var(--color-text-muted);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+/* ── Pagination ──────────────────────────────────────── */
+.hist-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.hist-page-btn {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-md);
+  padding: 7px 18px;
+  font-size: 0.82rem;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.hist-page-btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent-hover);
+}
+
+.hist-page-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.hist-page-info {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* ── States ──────────────────────────────────────────── */
+.hist-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.hist-empty {
+  text-align: center;
+  padding: 64px 16px;
+}
+
+.hist-empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 16px;
+}
+
+.hist-empty h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.hist-empty p {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-bottom: 24px;
+}
+
+/* ─────────────────────────────────────────────────────
+   SESSION DETAIL MODAL
+───────────────────────────────────────────────────── */
+.hist-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(4px);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: histFadeIn 0.18s ease;
+}
+
+@keyframes histFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.hist-panel {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 680px;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: histSlideUp 0.22s ease;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+@keyframes histSlideUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Panel header */
+.hist-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hist-panel-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.hist-panel-company {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  text-transform: capitalize;
+}
+
+.hist-panel-role {
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-hover);
+  border: 1px solid rgba(79,110,247,0.2);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.hist-panel-date {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.hist-panel-close {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+  font-family: var(--font-sans);
+}
+
+.hist-panel-close:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-muted);
+}
+
+/* Score */
+.hist-panel-score {
+  text-align: center;
+  border: 1px solid;
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.hist-panel-score-num {
+  font-size: 2.4rem;
+  font-weight: 900;
+  font-family: var(--font-mono);
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.hist-panel-score-label {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+/* Sections */
+.hist-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hist-panel-section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hist-panel-badge {
+  font-size: 0.65rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  padding: 1px 7px;
+  border-radius: 999px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+.hist-panel-question {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.65;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+
+.hist-panel-answer {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.7;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  white-space: pre-wrap;
+}
+
+.hist-panel-summary {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+
+/* Two col */
+.hist-panel-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.hist-panel-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hist-panel-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+}
+
+.hist-panel-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.hist-panel-empty {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Behavioral */
+.hist-behavioral-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.hist-behavioral-item {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  text-align: center;
+}
+
+.hist-behavioral-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.hist-behavioral-label {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .hist-main          { padding: 20px 16px; }
+  .hist-card-question { display: none; }
+  .hist-card-left     { width: auto; }
+  .hist-panel-two-col { grid-template-columns: 1fr; }
+  .hist-behavioral-grid { grid-template-columns: 1fr 1fr; }
+  .hist-page-header   { flex-direction: column; align-items: flex-start; }
+  .hist-panel         { padding: 20px; }
+}

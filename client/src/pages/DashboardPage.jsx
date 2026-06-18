@@ -11,18 +11,15 @@ import {
 import '../dashboard.css';
 
 // ── Helpers ───────────────────────────────────────────────
-const parseScore = (scoreStr) => {
-  if (!scoreStr) return null;
-  const match = scoreStr.match(/(\d+)\/(\d+)/);
-  return match ? parseInt(match[1]) : null;
+const parseScore = (s) => {
+  const m = s?.match(/(\d+)\/(\d+)/);
+  return m ? parseInt(m[1]) : null;
 };
 
-const formatDate = (iso) => {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-IN', {
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short',
   });
-};
 
 const COMPANY_COLORS = {
   google: '#4285F4', amazon: '#FF9900', meta: '#0081FB',
@@ -50,7 +47,6 @@ const StatCard = ({ icon, label, value, sub, color }) => (
   </div>
 );
 
-// ── Custom Tooltip ────────────────────────────────────────
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -65,61 +61,63 @@ const CustomTooltip = ({ active, payload, label }) => {
 // MAIN DASHBOARD PAGE
 // ─────────────────────────────────────────────────────────
 const DashboardPage = () => {
-  const { user, logout } = useAuth();
+  const { user, logout }  = useAuth();
   const navigate          = useNavigate();
-
   const [sessions,  setSessions]  = useState([]);
   const [recData,   setRecData]   = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     setLoading(true);
+    setError('');
     try {
       const [histRes, recRes] = await Promise.all([
-        getSessionHistory(1, 50),   // last 50 sessions
+        getSessionHistory(1, 50),
         getRecommendations(),
       ]);
-
-      if (histRes.success) setSessions(histRes.sessions || []);
-      if (recRes.success && recRes.hasData) setRecData(recRes);
-
+      if (histRes.success) {
+        setSessions(histRes.sessions || []);
+      } else {
+        setError('Unable to load your session history. Please refresh the page.');
+      }
+      if (recRes.success && recRes.hasData) {
+        setRecData(recRes);
+      } else if (!recRes.success) {
+        setError((prev) => prev || 'Unable to load recommendations right now.');
+      }
     } catch (e) {
-      setError('Failed to load dashboard data.');
+      console.error('Dashboard load error:', e.message);
+      setError('Unable to load dashboard data. Please try again later.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
   // ── Derived stats ──────────────────────────────────────
-  const scores = sessions
-    .map((s) => parseScore(s.score))
-    .filter(Boolean);
+  const scores = sessions.map((s) => parseScore(s.score)).filter(Boolean);
 
-  const avgScore     = scores.length
+  const avgScore      = scores.length
     ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
     : '—';
-  const bestScore    = scores.length ? Math.max(...scores) : '—';
+  const bestScore     = scores.length ? Math.max(...scores) : '—';
   const totalSessions = sessions.length;
 
-  // Score trend data (last 10)
   const trendData = sessions
     .slice(0, 10)
     .reverse()
-    .map((s, i) => ({
+    .map((s) => ({
       name:  formatDate(s.createdAt),
       score: parseScore(s.score) || 0,
     }));
 
-  // Company distribution
   const companyCount = {};
   sessions.forEach((s) => {
-    const label = s.company?.replace('_', ' ');
+    const label = (s.company || '').replace('_', ' ');
     companyCount[label] = (companyCount[label] || 0) + 1;
   });
   const companyData = Object.entries(companyCount)
@@ -127,23 +125,21 @@ const DashboardPage = () => {
     .slice(0, 6)
     .map(([name, count]) => ({ name, count }));
 
-  // Best company (highest avg score)
   const companyScores = {};
   sessions.forEach((s) => {
-    const c = s.company;
     const sc = parseScore(s.score);
     if (!sc) return;
-    if (!companyScores[c]) companyScores[c] = [];
-    companyScores[c].push(sc);
+    if (!companyScores[s.company]) companyScores[s.company] = [];
+    companyScores[s.company].push(sc);
   });
   const bestCompany = Object.entries(companyScores)
     .map(([c, arr]) => ({
       company: c,
       avg: arr.reduce((a, b) => a + b, 0) / arr.length,
     }))
-    .sort((a, b) => b.avg - a.avg)[0]?.company?.replace('_', ' ') || '—';
+    .sort((a, b) => b.avg - a.avg)[0]
+    ?.company?.replace('_', ' ') || '—';
 
-  // Avg engagement
   const engagements = sessions
     .map((s) => s.emotionData?.engagementScore)
     .filter(Boolean);
@@ -151,7 +147,6 @@ const DashboardPage = () => {
     ? (engagements.reduce((a, b) => a + b, 0) / engagements.length).toFixed(1)
     : '—';
 
-  // ── Render ─────────────────────────────────────────────
   if (loading) {
     return (
       <div className="dash-loading">
@@ -164,22 +159,17 @@ const DashboardPage = () => {
   return (
     <div className="dash-page">
 
-      {/* ── Top Nav ──────────────────────────────────── */}
+      {/* Nav */}
       <nav className="dash-nav">
         <div className="dash-nav-brand">
           <span className="dash-nav-icon">🤖</span>
           <span className="dash-nav-name">InterviewAI</span>
         </div>
-
         <div className="dash-nav-links">
-          <Link to="/dashboard" className="dash-nav-link active">
-            Dashboard
-          </Link>
-          <Link to="/interview" className="dash-nav-link">
-            Practice
-          </Link>
+          <Link to="/dashboard" className="dash-nav-link active">Dashboard</Link>
+          <Link to="/history"   className="dash-nav-link">History</Link>
+          <Link to="/interview" className="dash-nav-link">Practice</Link>
         </div>
-
         <div className="dash-nav-right">
           <span className="dash-nav-user">👋 {user?.name}</span>
           <button className="dash-nav-logout" onClick={handleLogout}>
@@ -188,14 +178,15 @@ const DashboardPage = () => {
         </div>
       </nav>
 
-      {/* ── Content ──────────────────────────────────── */}
+      {/* Content */}
       <main className="dash-main">
 
         {/* Header */}
         <div className="dash-page-header">
           <div>
             <h1 className="dash-page-title">
-              Welcome back, {user?.name?.split(' ')[0]} 👋
+              Welcome back, {user?.name} 👋
+
             </h1>
             <p className="dash-page-sub">
               Here's your interview performance overview
@@ -206,7 +197,20 @@ const DashboardPage = () => {
           </Link>
         </div>
 
-        {/* No sessions state */}
+        {error && (
+          <div style={{
+            border: '1px solid #fca5a5',
+            background: '#fee2e2',
+            color: '#991b1b',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            marginBottom: '18px',
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* Empty */}
         {totalSessions === 0 && (
           <div className="dash-empty">
             <div className="dash-empty-icon">🎯</div>
@@ -220,94 +224,60 @@ const DashboardPage = () => {
 
         {totalSessions > 0 && (
           <>
-            {/* ── Stat Cards ─────────────────────────── */}
+            {/* Stat Cards */}
             <div className="dash-stats-grid">
-              <StatCard
-                icon="📊" label="Total Sessions"
-                value={totalSessions} color="#4f6ef7"
-              />
-              <StatCard
-                icon="⭐" label="Average Score"
-                value={`${avgScore}/10`} color="#fbbf24"
-              />
-              <StatCard
-                icon="🏆" label="Best Score"
-                value={`${bestScore}/10`} color="#34d399"
-              />
-              <StatCard
-                icon="📹" label="Avg Engagement"
+              <StatCard icon="📊" label="Total Sessions"
+                value={totalSessions} color="#4f6ef7" />
+              <StatCard icon="⭐" label="Average Score"
+                value={`${avgScore}/10`} color="#fbbf24" />
+              <StatCard icon="🏆" label="Best Score"
+                value={`${bestScore}/10`} color="#34d399" />
+              <StatCard icon="📹" label="Avg Engagement"
                 value={avgEngagement !== '—' ? `${avgEngagement}/10` : '—'}
-                color="#a78bfa"
-                sub="behavioral"
-              />
+                color="#a78bfa" sub="behavioral" />
             </div>
 
-            {/* ── Charts Row ─────────────────────────── */}
+            {/* Charts */}
             <div className="dash-charts-row">
 
-              {/* Score Trend */}
               <div className="dash-card">
                 <h3 className="dash-card-title">📈 Score Trend</h3>
                 <p className="dash-card-sub">Last {trendData.length} sessions</p>
                 <div className="dash-chart-wrapper">
                   <ResponsiveContainer width="100%" height={200}>
                     <LineChart data={trendData}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="rgba(255,255,255,0.05)"
-                      />
-                      <XAxis
-                        dataKey="name"
+                      <CartesianGrid strokeDasharray="3 3"
+                        stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="name"
                         tick={{ fill: '#64748b', fontSize: 11 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        domain={[0, 10]}
+                        axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 10]}
                         tick={{ fill: '#64748b', fontSize: 11 }}
-                        axisLine={false}
-                        tickLine={false}
-                        width={20}
-                      />
+                        axisLine={false} tickLine={false} width={20} />
                       <Tooltip content={<CustomTooltip />} />
-                      <Line
-                        type="monotone"
-                        dataKey="score"
-                        stroke="#4f6ef7"
-                        strokeWidth={2.5}
+                      <Line type="monotone" dataKey="score"
+                        stroke="#4f6ef7" strokeWidth={2.5}
                         dot={{ fill: '#4f6ef7', r: 4 }}
-                        activeDot={{ r: 6, fill: '#a78bfa' }}
-                      />
+                        activeDot={{ r: 6, fill: '#a78bfa' }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              {/* Company Distribution */}
               <div className="dash-card">
                 <h3 className="dash-card-title">🏢 Practice Distribution</h3>
                 <p className="dash-card-sub">Sessions by company</p>
                 <div className="dash-chart-wrapper">
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={companyData} barSize={28}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="rgba(255,255,255,0.05)"
-                        vertical={false}
-                      />
-                      <XAxis
-                        dataKey="name"
+                      <CartesianGrid strokeDasharray="3 3"
+                        stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis dataKey="name"
                         tick={{ fill: '#64748b', fontSize: 10 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fill: '#64748b', fontSize: 11 }}
-                        axisLine={false}
-                        tickLine={false}
-                        width={20}
-                        allowDecimals={false}
-                      />
+                        axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: '#64748b', fontSize: 11 }}
+                        axisLine={false} tickLine={false}
+                        width={20} allowDecimals={false} />
                       <Tooltip
                         contentStyle={{
                           background: '#1c1f29',
@@ -322,8 +292,9 @@ const DashboardPage = () => {
                           <Cell
                             key={i}
                             fill={
-                              COMPANY_COLORS[entry.name.toLowerCase().replace(' ', '')] ||
-                              '#4f6ef7'
+                              COMPANY_COLORS[
+                                entry.name.toLowerCase().replace(' ', '')
+                              ] || '#4f6ef7'
                             }
                           />
                         ))}
@@ -335,9 +306,27 @@ const DashboardPage = () => {
 
             </div>
 
-            {/* ── Recent Sessions ─────────────────────── */}
+            {/* Recent Sessions Table */}
             <div className="dash-card">
-              <h3 className="dash-card-title">🕐 Recent Sessions</h3>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '4px',
+              }}>
+                <h3 className="dash-card-title">🕐 Recent Sessions</h3>
+                <Link
+                  to="/history"
+                  style={{
+                    fontSize: '0.78rem',
+                    color: 'var(--color-accent-hover)',
+                    textDecoration: 'none',
+                    fontWeight: 600,
+                  }}
+                >
+                  View all →
+                </Link>
+              </div>
               <p className="dash-card-sub">
                 Your last {Math.min(sessions.length, 8)} interviews
               </p>
@@ -361,19 +350,27 @@ const DashboardPage = () => {
                         sc >= 4 ? '#fb923c' : '#f87171';
 
                       return (
-                        <tr key={i}>
+                        <tr
+                          key={i}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => navigate('/history')}
+                        >
                           <td>
                             <div className="dash-company-cell">
                               <img
                                 src={`https://www.google.com/s2/favicons?domain=${
-                                  s.company?.replace('_general', '.com').replace('_', '') + '.com'
+                                  (s.company || 'google')
+                                    .replace('_general', '')
+                                    .replace('_', '') + '.com'
                                 }&sz=32`}
                                 alt=""
                                 className="dash-company-logo"
-                                onError={(e) => { e.target.style.display = 'none'; }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                }}
                               />
-                              <span>
-                                {s.company?.replace('_', ' ') || '—'}
+                              <span style={{ textTransform: 'capitalize' }}>
+                                {(s.company || '').replace('_', ' ')}
                               </span>
                             </div>
                           </td>
@@ -385,7 +382,11 @@ const DashboardPage = () => {
                           <td>
                             <span
                               className="dash-score-badge"
-                              style={{ color: scoreColor, borderColor: scoreColor + '44', background: scoreColor + '11' }}
+                              style={{
+                                color:        scoreColor,
+                                borderColor:  scoreColor + '44',
+                                background:   scoreColor + '11',
+                              }}
                             >
                               {s.score || '—'}
                             </span>
@@ -406,14 +407,15 @@ const DashboardPage = () => {
               </div>
             </div>
 
-            {/* ── Bottom Row ──────────────────────────── */}
+            {/* Bottom Row */}
             <div className="dash-bottom-row">
 
-              {/* Weak Areas */}
               {recData?.performanceSummary?.topWeakAreas?.length > 0 && (
                 <div className="dash-card">
                   <h3 className="dash-card-title">⚠️ Top Weak Areas</h3>
-                  <p className="dash-card-sub">Based on AI feedback across sessions</p>
+                  <p className="dash-card-sub">
+                    Based on AI feedback across sessions
+                  </p>
                   <div className="dash-weak-list">
                     {recData.performanceSummary.topWeakAreas
                       .slice(0, 5)
@@ -423,56 +425,68 @@ const DashboardPage = () => {
                             <div
                               className="dash-weak-bar-fill"
                               style={{
-                                width: `${Math.min(100, (w.count / sessions.length) * 100 * 2)}%`,
+                                width: `${Math.min(
+                                  100,
+                                  (w.count / sessions.length) * 100 * 2
+                                )}%`,
                               }}
                             />
                           </div>
                           <span className="dash-weak-text">{w.area}</span>
-                          <span className="dash-weak-count">
-                            ×{w.count}
-                          </span>
+                          <span className="dash-weak-count">×{w.count}</span>
                         </div>
                       ))}
                   </div>
                 </div>
               )}
 
-              {/* Behavioral Summary */}
               <div className="dash-card">
                 <h3 className="dash-card-title">📹 Behavioral Summary</h3>
                 <p className="dash-card-sub">Average across all sessions</p>
                 <div className="dash-behavioral-grid">
                   {[
                     {
-                      label: 'Eye Contact',
-                      icon: '👁️',
-                      value: sessions.filter(s => s.emotionData?.eyeContact).length > 0
-                        ? `${(sessions.reduce((a, s) => a + (s.emotionData?.eyeContact || 0), 0) / sessions.filter(s => s.emotionData?.eyeContact).length * 100).toFixed(0)}%`
+                      label: 'Eye Contact', icon: '👁️', color: '#4f6ef7',
+                      value: sessions.filter(
+                        (s) => s.emotionData?.eyeContact
+                      ).length > 0
+                        ? `${(
+                            sessions.reduce(
+                              (a, s) => a + (s.emotionData?.eyeContact || 0), 0
+                            ) /
+                            sessions.filter((s) => s.emotionData?.eyeContact)
+                              .length *
+                            100
+                          ).toFixed(0)}%`
                         : '—',
-                      color: '#4f6ef7',
                     },
                     {
-                      label: 'Engagement',
-                      icon: '🔥',
-                      value: avgEngagement !== '—' ? `${avgEngagement}/10` : '—',
-                      color: '#fbbf24',
-                    },
-                    {
-                      label: 'Face Presence',
-                      icon: '👤',
-                      value: sessions.filter(s => s.emotionData?.facePresence).length > 0
-                        ? `${(sessions.reduce((a, s) => a + (s.emotionData?.facePresence || 0), 0) / sessions.filter(s => s.emotionData?.facePresence).length * 100).toFixed(0)}%`
+                      label: 'Engagement', icon: '🔥', color: '#fbbf24',
+                      value: avgEngagement !== '—'
+                        ? `${avgEngagement}/10`
                         : '—',
-                      color: '#34d399',
                     },
                     {
-                      label: 'Best Company',
-                      icon: '🏆',
+                      label: 'Face Presence', icon: '👤', color: '#34d399',
+                      value: sessions.filter(
+                        (s) => s.emotionData?.facePresence
+                      ).length > 0
+                        ? `${(
+                            sessions.reduce(
+                              (a, s) => a + (s.emotionData?.facePresence || 0), 0
+                            ) /
+                            sessions.filter((s) => s.emotionData?.facePresence)
+                              .length *
+                            100
+                          ).toFixed(0)}%`
+                        : '—',
+                    },
+                    {
+                      label: 'Best Company', icon: '🏆', color: '#a78bfa',
                       value: bestCompany,
-                      color: '#a78bfa',
                     },
-                  ].map((m, i) => (
-                    <div key={i} className="dash-behavioral-item">
+                  ].map((m) => (
+                    <div key={m.label} className="dash-behavioral-item">
                       <span className="dash-behavioral-icon">{m.icon}</span>
                       <span
                         className="dash-behavioral-value"

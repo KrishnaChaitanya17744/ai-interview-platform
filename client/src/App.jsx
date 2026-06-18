@@ -8,12 +8,13 @@ import {
   Navigate,
 } from 'react-router-dom';
 
-import { AuthProvider }    from './context/AuthContext';
-import ProtectedRoute      from './components/ProtectedRoute';
-import LoginPage           from './pages/LoginPage';
-import RegisterPage        from './pages/RegisterPage';
-import InterviewPage       from './pages/InterviewPage';
-import DashboardPage       from './pages/DashboardPage';   // ← NEW
+import { AuthProvider }  from './context/AuthContext';
+import ProtectedRoute    from './components/ProtectedRoute';
+import LoginPage         from './pages/LoginPage';
+import RegisterPage      from './pages/RegisterPage';
+import InterviewPage     from './pages/InterviewPage';
+import DashboardPage     from './pages/DashboardPage';
+import HistoryPage       from './pages/HistoryPage';
 
 import './App.css';
 
@@ -26,22 +27,30 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
 
           <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/history"
+            element={
+              <ProtectedRoute>
+                <HistoryPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/interview"
             element={
               <ProtectedRoute>
                 <div className="app-wrapper">
                   <InterviewPage />
                 </div>
-              </ProtectedRoute>
-            }
-          />
-
-          {/* NEW */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
               </ProtectedRoute>
             }
           />

@@ -1,54 +1,40 @@
 // client/src/pages/InterviewPage.jsx
 
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import RoleSelector   from '../components/RoleSelector';
-import QuestionDisplay from '../components/QuestionDisplay';
-import FeedbackDisplay from '../components/FeedbackDisplay';
-import { generateQuestion, evaluateAnswer } from '../services/api';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth }           from '../context/AuthContext';
+import RoleSelector          from '../components/RoleSelector';
+import QuestionDisplay       from '../components/QuestionDisplay';
+import FeedbackDisplay       from '../components/FeedbackDisplay';
+import { generateQuestion, evaluateAnswer } from '../services/api';
 
 const InterviewPage = () => {
-
   const { user, logout }  = useAuth();
-  const navigate          = useNavigate();
+  const navigate           = useNavigate();
 
-  const [role, setRole]               = useState('');
-  const [company, setCompany]         = useState('');
-  const [companyType, setCompanyType] = useState('');
-  const [question, setQuestion]       = useState('');
-  const [answer, setAnswer]           = useState('');
-  const [feedback, setFeedback]       = useState(null);
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState('');
-  const [step, setStep]               = useState('select');
-
-  // Track asked questions to avoid duplicates
-  const [askedQuestions, setAskedQuestions] = useState([]);
-  const [questionSource, setQuestionSource] = useState('');
-
-  // Emotion data from VideoPanel
-  const [emotionData, setEmotionData] = useState({
-    confidence:      0,
-    nervousness:     0,
-    eyeContact:      0,
-    facePresence:    0,
-    engagementScore: 0,
+  const [role,         setRole]         = useState('');
+  const [company,      setCompany]      = useState('');
+  const [companyType,  setCompanyType]  = useState('');
+  const [question,     setQuestion]     = useState('');
+  const [answer,       setAnswer]       = useState('');
+  const [feedback,     setFeedback]     = useState(null);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState('');
+  const [step,         setStep]         = useState('select');
+  const [askedQuestions,   setAskedQuestions]   = useState([]);
+  const [questionSource,   setQuestionSource]   = useState('');
+  const [emotionData,      setEmotionData]      = useState({
+    confidence: 0, nervousness: 0,
+    eyeContact: 0, facePresence: 0, engagementScore: 0,
   });
 
-  // ── Logout handler ────────────────────────────────────
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  const handleLogout = () => { logout(); navigate('/login'); };
 
-  // ── Company selection ─────────────────────────────────
   const handleCompanyChange = (selectedCompany, selectedType) => {
     setCompany(selectedCompany);
     setCompanyType(selectedType);
   };
 
-  // ── Generate Question ─────────────────────────────────
   const handleGenerateQuestion = async () => {
     if (!role || !company) {
       setError('Please select both a role and a company to continue.');
@@ -65,31 +51,26 @@ const InterviewPage = () => {
         setQuestionSource(data.source || '');
         setAnswer('');
         setEmotionData({
-          confidence:      0,
-          nervousness:     0,
-          eyeContact:      0,
-          facePresence:    0,
-          engagementScore: 0,
+          confidence: 0, nervousness: 0,
+          eyeContact: 0, facePresence: 0, engagementScore: 0,
         });
         setStep('question');
         setAskedQuestions((prev) => [...prev, data.question]);
       } else {
-        // Session expired — redirect to login
-        if (data.message?.includes('token') ||
-            data.message?.includes('Access denied')) {
-          logout();
-          navigate('/login');
-          return;
+        if (
+          data.message?.includes('token') ||
+          data.message?.includes('Access denied')
+        ) {
+          logout(); navigate('/login'); return;
         }
         setError('Failed to generate a question. Please try again.');
       }
-    } catch (err) {
+    } catch {
       setError('Connection error. Please check your server is running.');
     }
     setLoading(false);
   };
 
-  // ── Submit Answer ─────────────────────────────────────
   const handleSubmitAnswer = async () => {
     if (!answer.trim()) return;
     setError('');
@@ -97,28 +78,26 @@ const InterviewPage = () => {
     try {
       const data = await evaluateAnswer(
         role, companyType, company,
-        question, answer, 'voice',
-        emotionData
+        question, answer, 'voice', emotionData
       );
       if (data.success) {
         setFeedback({ ...data.feedback, emotionData });
         setStep('feedback');
       } else {
-        if (data.message?.includes('token') ||
-            data.message?.includes('Access denied')) {
-          logout();
-          navigate('/login');
-          return;
+        if (
+          data.message?.includes('token') ||
+          data.message?.includes('Access denied')
+        ) {
+          logout(); navigate('/login'); return;
         }
         setError('Failed to evaluate your answer. Please try again.');
       }
-    } catch (err) {
+    } catch {
       setError('Connection error. Please check your server is running.');
     }
     setLoading(false);
   };
 
-  // ── Retry — keeps session history ─────────────────────
   const handleRetry = () => {
     setQuestion('');
     setAnswer('');
@@ -128,7 +107,6 @@ const InterviewPage = () => {
     setStep('select');
   };
 
-  // ── New Session — resets everything ───────────────────
   const handleNewSession = () => {
     setRole('');
     setCompany('');
@@ -145,10 +123,10 @@ const InterviewPage = () => {
   return (
     <div className="interview-page">
 
-      {/* ── Header ─────────────────────────────────────── */}
+      {/* Header */}
       <header className="site-header">
         <div className="header-eyebrow">
-          <span className="header-eyebrow-dot"></span>
+          <span className="header-eyebrow-dot" />
           AI-Powered Interview Prep
         </div>
         <h1>
@@ -160,31 +138,28 @@ const InterviewPage = () => {
           and instant AI feedback — built for serious candidates.
         </p>
 
-        {/* User info + navigation + logout */}
-{user && (
-  <div className="header-user-bar">
-    <span className="header-user-name">
-      👋 {user.name}
-    </span>
-    <Link to="/dashboard" className="header-dashboard-link">
-      ← Dashboard
-    </Link>
-    <button
-      className="header-logout-btn"
-      onClick={handleLogout}
-    >
-      Sign Out
-    </button>
-  </div>
-)}
+        {user && (
+          <div className="header-user-bar">
+            <span className="header-user-name">👋 {user.name}</span>
+            <Link to="/dashboard" className="header-dashboard-link">
+              ← Dashboard
+            </Link>
+            <Link to="/history" className="header-dashboard-link">
+              History
+            </Link>
+            <button className="header-logout-btn" onClick={handleLogout}>
+              Sign Out
+            </button>
+          </div>
+        )}
       </header>
 
-      {/* ── Step Indicator ─────────────────────────────── */}
+      {/* Steps */}
       <nav className="steps-indicator" aria-label="Progress">
         {[
-          { key: 'select',   label: 'Select Role',    num: '1' },
-          { key: 'question', label: 'Answer Question', num: '2' },
-          { key: 'feedback', label: 'View Feedback',   num: '3' },
+          { key: 'select',   label: 'Select Role',     num: '1' },
+          { key: 'question', label: 'Answer Question',  num: '2' },
+          { key: 'feedback', label: 'View Feedback',    num: '3' },
         ].map((s, i) => (
           <React.Fragment key={s.key}>
             <div className={`step-item ${step === s.key ? 'active' : ''}`}>
@@ -196,13 +171,12 @@ const InterviewPage = () => {
         ))}
       </nav>
 
-      {/* ── Session Info ───────────────────────────────── */}
+      {/* Session info */}
       {askedQuestions.length > 0 && step === 'select' && (
         <div className="session-info">
           <span>
             <strong>{askedQuestions.length}</strong> question
-            {askedQuestions.length !== 1 ? 's' : ''} answered
-            this session
+            {askedQuestions.length !== 1 ? 's' : ''} answered this session
           </span>
           <button className="new-session-btn" onClick={handleNewSession}>
             New Session
@@ -210,15 +184,14 @@ const InterviewPage = () => {
         </div>
       )}
 
-      {/* ── Error ──────────────────────────────────────── */}
+      {/* Error */}
       {error && (
         <div className="error-message" role="alert">
-          <span>⚠</span>
-          {error}
+          <span>⚠</span> {error}
         </div>
       )}
 
-      {/* ── Step 1: Select Role & Company ──────────────── */}
+      {/* Step 1 */}
       {step === 'select' && (
         <>
           <RoleSelector
@@ -250,7 +223,7 @@ const InterviewPage = () => {
         </>
       )}
 
-      {/* ── Step 2: Answer Question ─────────────────────── */}
+      {/* Step 2 */}
       {step === 'question' && (
         <QuestionDisplay
           question={question}
@@ -264,7 +237,7 @@ const InterviewPage = () => {
         />
       )}
 
-      {/* ── Step 3: View Feedback ───────────────────────── */}
+      {/* Step 3 */}
       {step === 'feedback' && (
         <FeedbackDisplay
           feedback={feedback}
